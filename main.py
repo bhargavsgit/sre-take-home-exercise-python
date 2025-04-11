@@ -2,6 +2,7 @@ import yaml
 import requests
 import time
 from collections import defaultdict
+from urllib.parse import urlparse
 
 # Function to load configuration from the YAML file
 def load_config(file_path):
@@ -11,15 +12,17 @@ def load_config(file_path):
 # Function to perform health checks
 def check_health(endpoint):
     url = endpoint['url']
-    method = endpoint.get('method')
-    headers = endpoint.get('headers')
+    method = endpoint.get('method', 'GET').upper()
+    headers = endpoint.get('headers', {})
     body = endpoint.get('body')
-
+ 
     try:
-        response = requests.request(method, url, headers=headers, json=body)
-        if 200 <= response.status_code < 300:
+       start_time = time.time()
+       response = requests.request(method, url, headers=headers, json=body, timeout=0.5)
+       response_time = (time.time() - start_time) * 1000
+       if 200 <= response.status_code < 300 and response_time <= 500:
             return "UP"
-        else:
+       else:
             return "DOWN"
     except requests.RequestException:
         return "DOWN"
@@ -31,7 +34,7 @@ def monitor_endpoints(file_path):
 
     while True:
         for endpoint in config:
-            domain = endpoint["url"].split("//")[-1].split("/")[0]
+            domain = urlparse(endpoint["url"]).hostname
             result = check_health(endpoint)
 
             domain_stats[domain]["total"] += 1
